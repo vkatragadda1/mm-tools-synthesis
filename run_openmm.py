@@ -1,3 +1,4 @@
+from __future__ import print_function
 from simtk.openmm import app
 import simtk.openmm as mm
 from simtk import unit
@@ -12,12 +13,12 @@ forcefield = app.ForceField('amber99sbildn.xml', 'tip3p.xml')
 # Create system object using information in the force field:
 # forcefield: contains parameters of interactions
 # topology: lists of atoms, residues, and bonds
-system = forcefield.createSystem(pdb.topology, nonbondedMethod=app.PME, 
-    nonbondedCutoff=1.0*unit.nanometers, constraints=app.HBonds, rigidWater=True, 
+system = forcefield.createSystem(pdb.topology, nonbondedMethod=app.PME,
+    nonbondedCutoff=1.0*unit.nanometers, constraints=app.HBonds, rigidWater=True,
     ewaldErrorTolerance=0.0005)
 
 # Create a Langevin integrator for temperature control
-integrator = mm.LangevinIntegrator(300*unit.kelvin, 1.0/unit.picoseconds, 
+integrator = mm.LangevinIntegrator(300*unit.kelvin, 1.0/unit.picoseconds,
     2.0*unit.femtoseconds)
 
 # Add a Monte Carlo barostat to the system for pressure control
@@ -30,6 +31,12 @@ platform = mm.Platform.getPlatformByName('CPU')
 ### of the existing forces, you should do it here - after the
 ### System has been created, but before the Simulation is created.
 
+frc=mm.CustomBondForce("0.5*k*(r-r0)^2")
+frc.addGlobalParameter("k", 1000)
+frc.addGlobalParameter("r0",2)
+frc.addBond(56,200)
+system.addForce(frc)
+
 # Create a Simulation object by putting together the objects above
 simulation = app.Simulation(pdb.topology, system, integrator, platform)
 
@@ -38,7 +45,9 @@ simulation.context.setPositions(pdb.positions)
 
 # Minimize the energy of the system (intentionally doing a rough minimization)
 print('Minimizing...')
+print(simulation.context.getState(getEnergy=True).getPotentialEnergy())
 simulation.minimizeEnergy(maxIterations=20, tolerance=100)
+print(simulation.context.getState(getEnergy=True).getPotentialEnergy())
 
 # Initialize the random velocities of the system from a Maxwell-Boltzmann distribution
 simulation.context.setVelocitiesToTemperature(300*unit.kelvin)
@@ -62,10 +71,12 @@ simulation.step(2500)
 # A: Christian Bale
 simulation.reporters.clear()
 simulation.reporters.append(app.DCDReporter('trajectory.dcd', 100))
-simulation.reporters.append(app.StateDataReporter(stdout, 500, step=True, 
-    potentialEnergy=True, temperature=True, density=True, progress=True, 
+simulation.reporters.append(app.StateDataReporter(stdout, 500, step=True,
+    potentialEnergy=True, temperature=True, density=True, progress=True,
     remainingTime=True, speed=True, totalSteps=22500, separator='\t'))
 # Run the production simulation!
 print('Running Production...')
 simulation.step(20000)
-print('Done!')
+
+
+
